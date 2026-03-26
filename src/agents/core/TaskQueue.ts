@@ -1,10 +1,14 @@
-import { Task } from './types';
+import { AgentResult, Task } from './types';
 import { agentRegistry } from './AgentRegistry';
-import { agentOrchestrator } from './AgentOrchestrator';
 
 class TaskQueue {
   private queue: Task[] = [];
   private isProcessing = false;
+  private onTaskComplete: ((result: AgentResult) => void) | null = null;
+
+  setOnTaskComplete(handler: (result: AgentResult) => void) {
+    this.onTaskComplete = handler;
+  }
 
   enqueue(task: Task) {
     this.queue.push(task);
@@ -23,7 +27,7 @@ class TaskQueue {
     const agent = agentRegistry.getAgent(task.type);
     if (agent) {
       const result = await agent.process(task);
-      agentOrchestrator.handleTaskCompletion(result);
+      this.onTaskComplete?.(result);
     }
 
     this.isProcessing = false;

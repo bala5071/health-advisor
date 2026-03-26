@@ -1,19 +1,24 @@
 import React from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { TextInput, StyleSheet } from 'react-native';
+import { useTheme } from '../theme/useTheme';
 
 interface FormFieldProps {
   placeholder: string;
   value: string;
   onChangeText: (text: string) => void;
+  accessibilityLabel?: string;
 }
 
-export default function FormField({ placeholder, value, onChangeText }: FormFieldProps) {
+export default function FormField({ placeholder, value, onChangeText, accessibilityLabel }: FormFieldProps) {
+  const theme = useTheme();
   return (
     <TextInput
-      style={styles.input}
+      style={[styles.input, { borderColor: theme.secondary, color: theme.text }]}
       placeholder={placeholder}
+      placeholderTextColor={theme.secondary}
       value={value}
       onChangeText={onChangeText}
+      accessibilityLabel={accessibilityLabel ?? placeholder}
     />
   );
 }

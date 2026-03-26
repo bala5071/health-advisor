@@ -1,0 +1,56 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../theme/useTheme';
+import { SyncManager, SyncStatus } from '../supabase/sync/SyncManager';
+
+export default function SyncStatusIndicator() {
+  const theme = useTheme();
+  const [status, setStatus] = useState<SyncStatus>(SyncManager.getStatus());
+
+  useEffect(() => {
+    return SyncManager.subscribe(setStatus);
+  }, []);
+
+  const label =
+    status.state === 'syncing'
+      ? 'Syncing'
+      : status.state === 'error'
+        ? 'Sync Error'
+        : 'Synced';
+
+  const color =
+    status.state === 'syncing'
+      ? theme.secondary
+      : status.state === 'error'
+        ? theme.danger
+        : theme.primary;
+
+  return (
+    <View style={[styles.wrap, { borderColor: theme.shadow }]}> 
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text style={[styles.text, { color: theme.text }]}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-start',
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 10,
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+});

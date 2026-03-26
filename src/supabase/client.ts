@@ -8,15 +8,9 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: {
-      setItem: (key, value) => {
-        storage.set(key, value);
-      },
-      getItem: (key) => {
-        return storage.getString(key) ?? null;
-      },
-      removeItem: (key) => {
-        storage.delete(key);
-      },
+      setItem: storage.setItem,
+      getItem: storage.getItem,
+      removeItem: storage.removeItem,
     },
     autoRefreshToken: true,
     persistSession: true,

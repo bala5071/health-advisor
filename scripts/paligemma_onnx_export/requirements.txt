@@ -1,0 +1,11 @@
+torch>=2.2.0
+transformers>=4.48.0
+accelerate>=0.29.0
+safetensors>=0.4.3
+huggingface_hub>=0.23.0
+onnx>=1.16.0
+onnxscript>=0.1.0
+onnxruntime>=1.18.0
+onnxruntime-tools>=1.7.0
+numpy>=1.26.0
+pillow>=10.0.0

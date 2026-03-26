@@ -1,7 +1,7 @@
 import { View, Text, Button, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Camera } from 'expo-camera';
-import { useOnboarding } from '@/src/hooks/useOnboarding';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 const Permissions = () => {
   const router = useRouter();

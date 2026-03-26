@@ -14,6 +14,7 @@ config.resolver.nodeModulesPaths = [
 ];
 
 config.resolver.disableHierarchicalLookup = true;
+config.resolver.unstable_enablePackageExports = true;
 
 config.resolver.alias = {
   '@': path.resolve(projectRoot, 'src'),

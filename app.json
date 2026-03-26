@@ -2,6 +2,7 @@
   "expo": {
     "name": "health-advisor",
     "slug": "health-advisor",
+    "scheme": "health-advisor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.healthadvisor"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +27,11 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.anonymous.healthadvisor"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,7 +43,36 @@
           "cameraPermissionText": "$(PRODUCT_NAME) needs access to your Camera."
         }
       ],
+      "@morrowdigital/watermelondb-expo-plugin",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      "./plugins/withAndroidSupportExcludes",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": true,
+          "entitlementsProfile": "production",
+          "forceCxx20": true,
+          "enableOpenCLAndHexagon": true
+        }
+      ],
+      "onnxruntime-react-native",
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3f5dcb43-cfe8-4168-9fc4-be09237930f7"
+      }
+    }
   }
 }

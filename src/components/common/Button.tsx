@@ -6,12 +6,18 @@ interface ButtonProps {
   title: string;
   onPress: () => void;
   variant?: "primary" | "secondary" | "danger";
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  disabled?: boolean;
 }
 
 export default function Button({
   title,
   onPress,
   variant = "primary",
+  accessibilityLabel,
+  accessibilityHint,
+  disabled,
 }: ButtonProps) {
   const theme = useTheme();
 
@@ -35,8 +41,14 @@ export default function Button({
       style={[
         styles.button,
         { backgroundColor: variantStyles[variant].backgroundColor },
+        disabled ? styles.disabled : null,
       ]}
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={disabled ? { disabled: true } : undefined}
     >
       <Text style={[styles.text, { color: variantStyles[variant].textColor }]}>
         {title}
@@ -53,6 +65,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 8,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   text: {
     fontSize: 16,

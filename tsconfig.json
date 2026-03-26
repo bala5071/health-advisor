@@ -6,5 +6,9 @@
     "emitDecoratorMetadata": true,
     "jsx": "react-native",
 
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   }
 }

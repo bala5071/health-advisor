@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'health_profiles',
@@ -62,6 +62,16 @@ export default appSchema({
         { name: 'health_profile_id', type: 'string', isIndexed: true },
         { name: 'name', type: 'string' },
         { name: 'notes', type: 'string', isOptional: true },
+      ],
+    }),
+    tableSchema({
+      name: 'usda_foods',
+      columns: [
+        { name: 'fdc_id', type: 'number', isIndexed: true },
+        { name: 'name', type: 'string' },
+        { name: 'search_name', type: 'string', isIndexed: true },
+        { name: 'nutrients_json', type: 'string' },
+        { name: 'created_at', type: 'number' },
       ],
     }),
   ],

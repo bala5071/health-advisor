@@ -5,6 +5,7 @@ const TabsLayout = () => {
     <Tabs>
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="history" options={{ title: 'History' }} />
+      <Tabs.Screen name="emergency" options={{ title: 'Emergency', tabBarAccessibilityLabel: 'Emergency Mode' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       <Tabs.Screen name="reports" options={{ title: 'Reports' }} />
     </Tabs>
