@@ -88,7 +88,31 @@ export const buildHealthAdvisorPrompt = (opts: {
     'You are a careful health advisor. You must be conservative and avoid giving medical diagnosis. ' +
     'You provide product health guidance based on the user profile and analysis inputs.';
 
-  const instructions = `Return ONLY valid JSON with the following schema:\n{\n  "verdict": "APPROVED" | "CAUTION" | "AVOID",\n  "explanation": string,\n  "alternatives": string[]\n}\n\nRules:\n- If any severe allergen match is present, verdict MUST be \"AVOID\".\n- If nutrition flags show high sodium/sugar/saturated fat and user goals include low sodium/diabetes/weight, use \"CAUTION\" or \"AVOID\" depending on severity.\n- Explanation must be 2-6 sentences, plain language, actionable.\n- Alternatives: 1-3 short suggestions (e.g. "choose low-sodium version").`;
+  // Build explicit nutrition flag summary so model cannot hallucinate concerns
+  const flags = analysis?.nutritionResult?.flags ?? {};
+  const nutrition = analysis?.nutritionResult?.nutrition ?? {};
+
+  const sodiumMg = nutrition.sodiumMg ?? null;
+  const sugarG = nutrition.totalSugarsG ?? null;
+  const satFatG = nutrition.saturatedFatG ?? null;
+
+  const flagSummary = [
+    `- Sodium: ${sodiumMg !== null ? `${sodiumMg}mg` : 'unknown'} — ${flags.highSodium ? '⚠ HIGH (mention this concern)' : '✓ NOT high (do NOT mention sodium as a concern)'}`,
+    `- Sugar: ${sugarG !== null ? `${sugarG}g` : 'unknown'} — ${flags.highSugar ? '⚠ HIGH (mention this concern)' : '✓ NOT high (do NOT mention sugar as a concern)'}`,
+    `- Saturated fat: ${satFatG !== null ? `${satFatG}g` : 'unknown'} — ${flags.highSaturatedFat ? '⚠ HIGH (mention this concern)' : '✓ NOT high (do NOT mention saturated fat as a concern)'}`,
+  ].join('\n');
+
+  const instructions =
+    `Return ONLY valid JSON with the following schema:\n` +
+    `{\n  "verdict": "APPROVED" | "CAUTION" | "AVOID",\n  "explanation": string,\n  "alternatives": string[]\n}\n\n` +
+    `STRICT RULES — follow exactly:\n` +
+    `1. If any severe allergen match is present, verdict MUST be "AVOID".\n` +
+    `2. ONLY mention a nutrient as a concern if it is marked ⚠ HIGH in NUTRITION_FLAGS below.\n` +
+    `3. If a nutrient is marked ✓ NOT high, you MUST NOT mention it as a concern, even if the user has a related condition.\n` +
+    `4. Base verdict on allergen severity first, then flagged nutrients, then overall profile.\n` +
+    `5. Explanation must be 2-6 sentences, plain language, actionable.\n` +
+    `6. Alternatives: 1-3 short suggestions.\n\n` +
+    `NUTRITION_FLAGS (ground truth — do not override):\n${flagSummary}`;
 
   const payload = {
     user_profile: profile,

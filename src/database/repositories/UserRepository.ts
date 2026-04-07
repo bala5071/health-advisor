@@ -26,37 +26,53 @@ const normalizeHealthProfileData = (data: Partial<HealthProfile> & Record<string
 
 export const UserRepository = {
   async createHealthProfile(data: Partial<HealthProfile>) {
-    return await database.write(async () => {
-      const newProfile = await getHealthProfiles().create(profile => {
-        const normalized = normalizeHealthProfileData(data as any);
-        Object.assign(profile, normalized);
+    try {
+      const normalized = normalizeHealthProfileData(data as any);
+      if (!(normalized as any)?.userId) {
+        throw new Error('user_id is required to create health profile');
+      }
 
-        const now = Date.now();
-        (profile as any)._raw.created_at ??= now;
-        (profile as any)._raw.updated_at ??= now;
+      return await database.write(async () => {
+        const newProfile = await getHealthProfiles().create(profile => {
+          Object.assign(profile, normalized);
+
+          const now = Date.now();
+          (profile as any)._raw.created_at ??= now;
+          (profile as any)._raw.updated_at ??= now;
+        });
+        return newProfile;
       });
-      return newProfile;
-    });
+    } catch (error: any) {
+      throw new Error(`Failed to create health profile: ${String(error?.message ?? error)}`);
+    }
   },
 
   async getHealthProfile(userId: string) {
-    const profile = await getHealthProfiles().query(Q.where('user_id', userId)).fetch();
-    return profile.length > 0 ? profile[0] : null;
+    try {
+      const profile = await getHealthProfiles().query(Q.where('user_id', userId)).fetch();
+      return profile.length > 0 ? profile[0] : null;
+    } catch (error: any) {
+      throw new Error(`Failed to fetch health profile: ${String(error?.message ?? error)}`);
+    }
   },
 
   async updateHealthProfile(userId: string, data: Partial<HealthProfile>) {
-    const profile = await this.getHealthProfile(userId);
-    if (profile) {
-      return await database.write(async () => {
-        const updatedProfile = await profile.update(item => {
-          const normalized = normalizeHealthProfileData(data as any);
-          Object.assign(item, normalized);
-          (item as any)._raw.updated_at = Date.now();
+    try {
+      const profile = await this.getHealthProfile(userId);
+      if (profile) {
+        return await database.write(async () => {
+          const updatedProfile = await profile.update(item => {
+            const normalized = normalizeHealthProfileData(data as any);
+            Object.assign(item, normalized);
+            (item as any)._raw.updated_at = Date.now();
+          });
+          return updatedProfile;
         });
-        return updatedProfile;
-      });
+      }
+      return null;
+    } catch (error: any) {
+      throw new Error(`Failed to update health profile: ${String(error?.message ?? error)}`);
     }
-    return null;
   },
 
   async deleteHealthProfile(userId: string) {

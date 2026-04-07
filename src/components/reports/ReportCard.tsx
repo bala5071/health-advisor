@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Card from '../common/Card';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/useTheme';
 
 export default function ReportCard({
@@ -26,57 +26,65 @@ export default function ReportCard({
     }
   }, [createdAt]);
 
-  const badgeColor = clinicVisitFlag ? 'rgba(231, 76, 60, 0.16)' : 'rgba(52, 152, 219, 0.14)';
-
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <Card>
-        <View style={styles.top}>
-          <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-          <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-            <Text style={[styles.badgeText, { color: theme.text }]}>{clinicVisitFlag ? 'URGENT' : 'REPORT'}</Text>
-          </View>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.row}>
+      <View style={styles.left}>
+        <View style={[styles.iconCircle, { backgroundColor: clinicVisitFlag ? '#FF3B30' : '#34C759' }]}>
+          <Ionicons name="document-text" size={17} color="#FFFFFF" />
         </View>
-        <Text style={[styles.ts, { color: theme.text }]}>{ts}</Text>
-        <Text style={[styles.summary, { color: theme.text }]} numberOfLines={3}>
-          {summary}
-        </Text>
-      </Card>
+        <View style={styles.textWrap}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.summary, { color: theme.textSecondary }]} numberOfLines={1}>{summary}</Text>
+        </View>
+      </View>
+      <View style={styles.right}>
+        <Text style={[styles.ts, { color: theme.textSecondary }]}>{ts}</Text>
+        <Ionicons name="chevron-forward" size={17} color="#C7C7CC" />
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  top: {
+  row: {
+    minHeight: 50,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 6,
+    backgroundColor: '#FFFFFF',
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '900',
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '900',
+  textWrap: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '400',
   },
   ts: {
-    fontSize: 12,
-    fontWeight: '700',
-    opacity: 0.7,
-    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: '400',
+    marginRight: 6,
   },
   summary: {
     fontSize: 13,
-    fontWeight: '700',
-    opacity: 0.9,
+    fontWeight: '400',
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

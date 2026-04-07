@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Card from '../common/Card';
 import { useTheme } from '../../theme/useTheme';
 
@@ -12,8 +13,13 @@ export default function ClinicAlert({
 
   return (
     <Card>
-      <View style={[styles.wrap, { backgroundColor: 'rgba(231, 76, 60, 0.12)', borderColor: theme.danger }]}>
-        <Text style={[styles.title, { color: theme.danger }]}>Clinic Visit Recommended</Text>
+      <View style={[styles.wrap, { backgroundColor: '#FFF5F5', borderColor: '#FF3B30' }]}>
+        <View style={styles.headerRow}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="warning" size={16} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.title, { color: theme.danger }]}>Clinic Visit Recommended</Text>
+        </View>
         <Text style={[styles.text, { color: theme.text }]}>{message}</Text>
       </View>
     </Card>
@@ -23,17 +29,30 @@ export default function ClinicAlert({
 const styles = StyleSheet.create({
   wrap: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 14,
     gap: 8,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: '#FF3B30',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '600',
   },
   text: {
-    fontSize: 13,
-    fontWeight: '700',
-    opacity: 0.9,
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 20,
   },
 });

@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import Card from '../../src/components/common/Card';
-import Button from '../../src/components/common/Button';
+import { Ionicons } from '@expo/vector-icons';
 import ScanResultView from '../../src/components/scan/ScanResult';
 import { useAuth } from '../../src/components/AuthProvider';
 import { HealthTrackerAgent } from '../../src/agents/HealthTrackerAgent';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ScanResult() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedScanId, setSavedScanId] = useState<string | null>(null);
@@ -80,67 +81,195 @@ export default function ScanResult() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Scan Result</Text>
+    <View style={[styles.root, { backgroundColor: '#F2F2F7' }]}> 
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={handleDismiss} style={styles.backButton} accessibilityRole="button">
+          <Ionicons name="chevron-back" size={22} color="#007AFF" />
+          <Text style={styles.backLabel}>Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Scan Result</Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
-      {!parsed ? (
-        <Card>
-          <Text style={styles.text}>No result data found.</Text>
-          <Button title="Back" onPress={() => router.back()} />
-        </Card>
-      ) : (
-        <>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+      >
+        {!parsed ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>No result data found.</Text>
+          </View>
+        ) : (
           <ScanResultView data={parsed} onSave={handleSave} onDismiss={handleDismiss} saving={saving} />
-          {saveError ? (
-            <Card>
-              <Text style={styles.text}>Save failed: {saveError}</Text>
-            </Card>
-          ) : null}
-          {savedScanId ? (
-            <Card>
-              <Text style={styles.sectionTitle}>Advice outcome</Text>
-              <Text style={styles.text}>Did you follow this recommendation?</Text>
-              <Button
-                title={actionSaved === 'accepted' ? 'Accepted (saved)' : 'Accepted advice'}
+        )}
+
+        {saveError ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="warning" size={16} color="#FF3B30" />
+            <Text style={styles.errorBannerText}>Save failed: {saveError}</Text>
+          </View>
+        ) : null}
+
+        {savedScanId ? (
+          <View style={styles.outcomeCard}>
+            <Text style={styles.outcomeTitle}>Did you follow this recommendation?</Text>
+            <View style={styles.outcomeRow}>
+              <Pressable
+                style={[
+                  styles.outcomePill,
+                  styles.outcomePillAccept,
+                  actionSaved === 'accepted' ? styles.outcomePillSelected : null,
+                ]}
                 onPress={() => recordAction('accepted')}
-              />
-              <Button
-                title={actionSaved === 'rejected' ? 'Rejected (saved)' : 'Rejected advice'}
+              >
+                <Text style={styles.outcomePillText}>
+                  {actionSaved === 'accepted' ? '✓ Accepted' : 'Accepted'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.outcomePill,
+                  styles.outcomePillReject,
+                  actionSaved === 'rejected' ? styles.outcomePillSelected : null,
+                ]}
                 onPress={() => recordAction('rejected')}
-                variant="secondary"
-              />
-            </Card>
-          ) : null}
-        </>
-      )}
-    </ScrollView>
+              >
+                <Text style={styles.outcomePillText}>
+                  {actionSaved === 'rejected' ? '✓ Rejected' : 'Rejected'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {parsed ? (
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Pressable style={styles.bottomPrimary} onPress={handleDismiss}>
+            <Ionicons name="camera" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.bottomPrimaryText}>Scan Again</Text>
+          </Pressable>
+          <Pressable style={styles.bottomSecondary} onPress={handleSave} disabled={saving}>
+            <Ionicons name="bookmark-outline" size={18} color="#34C759" style={{ marginRight: 6 }} />
+            <Text style={styles.bottomSecondaryText}>{saving ? 'Saving…' : 'Save'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: { flex: 1, backgroundColor: '#F2F2F7' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: '#F2F2F7',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 70,
+    minHeight: 44,
+  },
+  backLabel: { fontSize: 17, color: '#007AFF', fontWeight: '400' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: '#1C1C1E' },
+  headerSpacer: { minWidth: 70 },
+  scroll: { paddingBottom: 20 },
+  emptyCard: {
+    margin: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: { fontSize: 15, color: '#8E8E93', textAlign: 'center' },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF3B30',
+  },
+  errorBannerText: { flex: 1, fontSize: 13, color: '#FF3B30', fontWeight: '500' },
+  outcomeCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
-    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
+  outcomeTitle: { fontSize: 15, fontWeight: '600', color: '#1C1C1E', marginBottom: 12 },
+  outcomeRow: { flexDirection: 'row', gap: 10 },
+  outcomePill: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 8,
+  outcomePillAccept: { backgroundColor: '#E9F8EE' },
+  outcomePillReject: { backgroundColor: '#FFF5F5' },
+  outcomePillSelected: { borderWidth: 2, borderColor: '#34C759' },
+  outcomePillText: { fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
   },
-  text: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 6,
+  bottomPrimary: {
+    flex: 2,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#34C759',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#34C759',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  mono: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    marginBottom: 6,
+  bottomPrimaryText: { fontSize: 17, fontWeight: '600', color: '#FFFFFF' },
+  bottomSecondary: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#34C759',
   },
+  bottomSecondaryText: { fontSize: 17, fontWeight: '600', color: '#34C759' },
+  sectionTitle: { fontSize: 13, fontWeight: '600', letterSpacing: 0.3, textTransform: 'uppercase' },
+  text: { fontSize: 15, fontWeight: '400' },
+  errorText: { color: '#FF3B30' },
+  container: { gap: 0 },
+  bottomActions: { position: 'absolute', left: 16, right: 16, bottom: 0 },
+  bottomButtonPrimary: { flex: 1 },
+  bottomButtonSecondary: { width: 120 },
+  closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  header2: { flexDirection: 'row', justifyContent: 'flex-end' },
 });

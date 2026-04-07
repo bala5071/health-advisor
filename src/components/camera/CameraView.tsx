@@ -8,7 +8,10 @@ interface CameraViewProps {
   onCapture: () => void;
   onToggleFlash: () => void;
   onFocus: (event: any) => void;
+  onCameraError?: (error: unknown) => void;
   flash: "on" | "off";
+  showControls?: boolean;
+  captureLabel?: string;
 }
 
 export default function CameraView({
@@ -17,7 +20,10 @@ export default function CameraView({
   onCapture,
   onToggleFlash,
   onFocus,
+  onCameraError,
   flash,
+  showControls = true,
+  captureLabel = 'Scan Now',
 }: CameraViewProps) {
   return (
     <View style={styles.container} onTouchEnd={onFocus} accessible={false}>
@@ -27,29 +33,34 @@ export default function CameraView({
         device={device}
         isActive={true}
         photo={true}
+        video={false}
+        audio={false}
+        onError={onCameraError}
       />
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={onToggleFlash}
-          accessibilityRole="button"
-          accessibilityLabel={flash === "on" ? "Turn flash off" : "Turn flash on"}
-          accessibilityHint="Toggles the camera flash"
-        >
-          <Text style={styles.text}>
-            {flash === "on" ? "Flash On" : "Flash Off"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={onCapture}
-          accessibilityRole="button"
-          accessibilityLabel="Capture photo"
-          accessibilityHint="Takes a picture for analysis"
-        >
-          <Text style={styles.text}>Capture</Text>
-        </TouchableOpacity>
-      </View>
+      {showControls ? (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={onToggleFlash}
+            accessibilityRole="button"
+            accessibilityLabel={flash === "on" ? "Turn flash off" : "Turn flash on"}
+            accessibilityHint="Toggles the camera flash"
+          >
+            <Text style={styles.text}>
+              {flash === "on" ? "Flash: On" : "Flash: Off"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.captureButton]}
+            onPress={onCapture}
+            accessibilityRole="button"
+            accessibilityLabel="Capture photo"
+            accessibilityHint="Takes a picture for analysis"
+          >
+            <Text style={styles.text}>{captureLabel}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -60,20 +71,33 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 98,
+    left: 16,
+    right: 16,
     flexDirection: "row",
-    justifyContent: "space-around",
-    padding: 20,
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 3,
   },
   button: {
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    minWidth: 112,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  captureButton: {
+    backgroundColor: "rgba(0,123,255,0.92)",
+    minWidth: 148,
+    paddingVertical: 14,
+    borderColor: "rgba(255,255,255,0.38)",
   },
   text: {
-    fontSize: 18,
+    fontSize: 15,
+    fontWeight: "800",
     color: "white",
   },
 });

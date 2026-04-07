@@ -2,6 +2,26 @@ import * as FileSystem from 'expo-file-system';
 
 let MMKVImpl: any;
 let kv: any;
+const fallbackKV = new Map<string, string>();
+
+let LegacyFileSystem: any;
+const getFileSystem = () => {
+  const fsAny = FileSystem as any;
+  if (fsAny?.documentDirectory && typeof fsAny?.createDownloadResumable === 'function') {
+    return fsAny;
+  }
+
+  if (!LegacyFileSystem) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      LegacyFileSystem = require('expo-file-system/legacy');
+    } catch {
+      LegacyFileSystem = null;
+    }
+  }
+
+  return LegacyFileSystem ?? fsAny;
+};
 
 const getMMKV = () => {
   if (!MMKVImpl) {
@@ -23,7 +43,19 @@ const getMMKV = () => {
 
 const getKV = () => {
   if (!kv) {
-    kv = getMMKV();
+    try {
+      kv = getMMKV();
+    } catch {
+      kv = {
+        getBoolean: (key: string) => fallbackKV.get(key) === 'true',
+        getString: (key: string) => {
+          const value = fallbackKV.get(key);
+          return value == null ? undefined : value;
+        },
+        set: (key: string, value: unknown) => fallbackKV.set(key, String(value)),
+        delete: (key: string) => fallbackKV.delete(key),
+      };
+    }
   }
   return kv;
 };
@@ -33,12 +65,17 @@ export const SLM_MODEL_URL =
 
 // Approximate size for UI display only (bytes)
 export const SLM_MODEL_SIZE_BYTES = 1100 * 1024 * 1024;
+const MIN_READY_BYTES = 10 * 1024 * 1024;
 
-export const LOCAL_SLM_PATH = `${(FileSystem as any).documentDirectory}models/qwen2.5-1.5b-instruct-q4_k_m.gguf`;
+const getDocumentDirectory = () => getFileSystem().documentDirectory ?? '';
+export const getLocalSlmPath = () => `${getDocumentDirectory()}models/qwen2.5-1.5b-instruct-q4_k_m.gguf`;
+export const LOCAL_SLM_PATH = getLocalSlmPath();
+
+const getSlmPath = () => getLocalSlmPath();
 
 const assertQuantizedModel = () => {
   // Defensive check: ensure path matches expected quant variant.
-  if (!LOCAL_SLM_PATH.toLowerCase().includes('q4')) {
+  if (!getSlmPath().toLowerCase().includes('q4')) {
     throw new Error('SLM model path does not appear to be a Q4 quantized model');
   }
 };
@@ -55,21 +92,42 @@ export const isSLMReady = (): boolean => {
 };
 
 const assertFileSystemReady = () => {
-  if (!(FileSystem as any).documentDirectory) {
+  if (!getFileSystem().documentDirectory) {
     throw new Error('expo-file-system documentDirectory is not available in this runtime');
   }
 };
 
 const ensureModelsDir = async (): Promise<{ dir: string; modelPath: string }> => {
   assertFileSystemReady();
-  const dir = `${(FileSystem as any).documentDirectory}models/`;
-  await (FileSystem as any).makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
-  return { dir, modelPath: LOCAL_SLM_PATH };
+  const fs = getFileSystem();
+  const dir = `${fs.documentDirectory}models/`;
+  await fs.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
+  return { dir, modelPath: getSlmPath() };
 };
 
 const fileExistsNonEmpty = async (path: string): Promise<boolean> => {
-  const info = await (FileSystem as any).getInfoAsync(path);
+  const info = await getFileSystem().getInfoAsync(path);
   return Boolean(info?.exists && typeof info.size === 'number' && info.size > 0);
+};
+
+const fileExistsWithMinimumSize = async (path: string, minimumBytes: number): Promise<boolean> => {
+  const info = await getFileSystem().getInfoAsync(path);
+  const fileSize = typeof info?.size === 'number' ? info.size : 0;
+  return Boolean(info?.exists && fileSize >= minimumBytes);
+};
+
+export const rehydrateSlmReadyFromDisk = async (minimumBytes = MIN_READY_BYTES): Promise<boolean> => {
+  try {
+    const { modelPath } = await ensureModelsDir();
+    const ready = await fileExistsWithMinimumSize(modelPath, minimumBytes);
+    if (ready) {
+      getKV().set(READY_KEY, true);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 };
 
 export const checkSLMExists = async (): Promise<boolean> => {
@@ -88,11 +146,12 @@ const downloadWithRetry = async (opts: {
   retries?: number;
 }): Promise<void> => {
   assertFileSystemReady();
+  const fs = getFileSystem();
   const retries = opts.retries ?? 3;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const existing = await (FileSystem as any).getInfoAsync(opts.localPath);
+      const existing = await fs.getInfoAsync(opts.localPath);
       if (existing?.exists && existing.size && existing.size > 0) {
         getKV().delete(opts.resumeKey);
         opts.onProgress(100);
@@ -102,7 +161,11 @@ const downloadWithRetry = async (opts: {
       const resumeStr = getKV().getString(opts.resumeKey);
       const resumeData = resumeStr ? JSON.parse(resumeStr) : undefined;
 
-      const downloadResumable = (FileSystem as any).createDownloadResumable(
+      if (typeof fs.createDownloadResumable !== 'function') {
+        throw new Error('createDownloadResumable is unavailable in this runtime');
+      }
+
+      const downloadResumable = fs.createDownloadResumable(
         opts.url,
         opts.localPath,
         {},
@@ -184,7 +247,7 @@ export const downloadSLM = async (onProgress: (pct0to100: number) => void): Prom
 
 export const deleteSLM = async (): Promise<void> => {
   const { modelPath } = await ensureModelsDir();
-  await (FileSystem as any).deleteAsync(modelPath, { idempotent: true }).catch(() => undefined);
+  await getFileSystem().deleteAsync(modelPath, { idempotent: true }).catch(() => undefined);
   getKV().delete(READY_KEY);
   getKV().delete(RESUME_KEY);
 };
@@ -192,6 +255,7 @@ export const deleteSLM = async (): Promise<void> => {
 export const SLMModelManager = {
   isSLMReady,
   checkSLMExists,
+  rehydrateSlmReadyFromDisk,
   downloadSLM,
   deleteSLM,
 };

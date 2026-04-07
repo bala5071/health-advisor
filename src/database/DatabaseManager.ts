@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import '../utils/watermelonPolyfill';
 import { NativeModules } from 'react-native';
 import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
@@ -18,16 +19,31 @@ const isWatermelonDbAvailable = (): boolean => {
   }
 };
 
+const isJestRuntime = (): boolean => typeof process !== 'undefined' && process.env?.JEST_WORKER_ID != null;
+
 const createDatabase = (): Database => {
-  const adapter = new SQLiteAdapter({
-    schema,
-    migrations,
-    jsi: true, // JSI is required for synchronous connections
-    onSetUpError: (error) => {
-      // Handle database setup errors
-      console.error('Database setup error:', error);
-    },
-  });
+  const onSetUpError = (error: unknown) => {
+    console.error('Database setup error:', error);
+  };
+
+  const adapter = isJestRuntime()
+    ? (() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const LokiJSAdapter = require('@nozbe/watermelondb/adapters/lokijs').default;
+        return new LokiJSAdapter({
+          schema,
+          dbName: 'health-advisor-test-db',
+          useWebWorker: false,
+          useIncrementalIndexedDB: false,
+          onSetUpError,
+        });
+      })()
+    : new SQLiteAdapter({
+        schema,
+        migrations,
+        jsi: false,
+        onSetUpError,
+      });
 
   return new Database({
     adapter,

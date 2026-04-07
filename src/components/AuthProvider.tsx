@@ -105,7 +105,9 @@ export const AuthProvider = ({ children }: any) => {
     session,
     user,
     loading,
-    signOut: () => supabase.auth.signOut(),
+    signOut: async () => {
+      await supabase.auth.signOut();
+    },
     signIn: (data: any) => supabase.auth.signInWithPassword(data),
     signUp: (data: any) => supabase.auth.signUp(data),
     signInWithGoogle: () => signInWithOAuth("google"),
@@ -116,7 +118,7 @@ export const AuthProvider = ({ children }: any) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

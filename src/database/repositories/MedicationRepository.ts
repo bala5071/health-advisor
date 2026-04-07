@@ -15,90 +15,90 @@ const normalizeMedicationData = (data: Partial<Medication> & Record<string, any>
   } as Partial<Medication>;
 };
 
+const encryptMedicationData = async (data: Partial<Medication> & Record<string, any>) => {
+  const normalized = normalizeMedicationData(data);
+  return {
+    ...normalized,
+    ...(normalized?.name != null ? { name: await EncryptionService.maybeEncrypt(normalized.name) } : null),
+    ...(normalized?.dosage != null ? { dosage: await EncryptionService.maybeEncrypt(normalized.dosage) } : null),
+    ...(normalized?.frequency != null ? { frequency: await EncryptionService.maybeEncrypt(normalized.frequency) } : null),
+    ...(normalized?.notes != null ? { notes: await EncryptionService.maybeEncrypt(normalized.notes) } : null),
+  } as Record<string, any>;
+};
+
+const getHealthProfileId = (data: Partial<Medication> & Record<string, any>) => (
+  (data as any)?.health_profile_id ?? (data as any)?.healthProfileId ?? null
+);
+
+const mapMedicationRow = async (row: any) => ({
+  id: row.id,
+  name: await EncryptionService.maybeDecrypt(row.name),
+  dosage: await EncryptionService.maybeDecrypt(row.dosage),
+  frequency: await EncryptionService.maybeDecrypt(row.frequency),
+  notes: await EncryptionService.maybeDecrypt(row.notes),
+  health_profile_id: row.healthProfileId,
+});
+
 export const MedicationRepository = {
   async createMedication(data: Partial<Medication>) {
-    return await database.write(async () => {
-      const newMedication = await getMedicationsCollection().create(medication => {
-        const normalized = normalizeMedicationData(data as any);
-        Object.assign(medication, normalized);
+    try {
+      const hpId = getHealthProfileId(data as any);
+      if (!hpId) {
+        throw new Error('health_profile_id is required to create a medication');
+      }
 
-        const hpId = (data as any).health_profile_id ?? (data as any).healthProfileId;
-        if (hpId != null) {
-          (medication as any)._raw.health_profile_id = hpId;
-        }
+      const encrypted = await encryptMedicationData(data as any);
+      return await database.write(async () => {
+        const newMedication = await getMedicationsCollection().create(medication => {
+          Object.assign(medication, encrypted);
+          (medication as any).healthProfileId = hpId;
+        });
+
+        return await mapMedicationRow(newMedication as any);
       });
-
-      await newMedication.update(async (item: any) => {
-        const normalized = normalizeMedicationData(data as any);
-        if (normalized?.name != null) item.name = await EncryptionService.maybeEncrypt(normalized.name);
-        if (normalized?.dosage != null) item.dosage = await EncryptionService.maybeEncrypt(normalized.dosage);
-        if (normalized?.frequency != null) item.frequency = await EncryptionService.maybeEncrypt(normalized.frequency);
-        if (normalized?.notes != null) item.notes = await EncryptionService.maybeEncrypt(normalized.notes);
-      });
-
-      return {
-        id: newMedication.id,
-        name: await EncryptionService.maybeDecrypt((newMedication as any).name),
-        dosage: await EncryptionService.maybeDecrypt((newMedication as any).dosage),
-        frequency: await EncryptionService.maybeDecrypt((newMedication as any).frequency),
-        notes: await EncryptionService.maybeDecrypt((newMedication as any).notes),
-        health_profile_id: (newMedication as any)?._raw?.health_profile_id,
-      } as any;
-    });
+    } catch (error: any) {
+      throw new Error(`Failed to create medication: ${String(error?.message ?? error)}`);
+    }
   },
 
   async getMedications(healthProfileId: string) {
-    const rows = await getMedicationsCollection().query(Q.where('health_profile_id', healthProfileId)).fetch();
-    const out: any[] = [];
-    for (const r of rows as any[]) {
-      out.push({
-        id: r.id,
-        name: await EncryptionService.maybeDecrypt(r.name),
-        dosage: await EncryptionService.maybeDecrypt(r.dosage),
-        frequency: await EncryptionService.maybeDecrypt(r.frequency),
-        notes: await EncryptionService.maybeDecrypt(r.notes),
-        health_profile_id: (r as any)?._raw?.health_profile_id,
-      });
+    try {
+      const rows = await getMedicationsCollection().query(Q.where('health_profile_id', healthProfileId)).fetch();
+      const out: any[] = [];
+      for (const r of rows as any[]) {
+        out.push(await mapMedicationRow(r));
+      }
+      return out;
+    } catch (error: any) {
+      throw new Error(`Failed to fetch medications: ${String(error?.message ?? error)}`);
     }
-    return out;
   },
 
   async updateMedication(medicationId: string, data: Partial<Medication>) {
     const medication = await getMedicationsCollection().find(medicationId);
+    const encrypted = await encryptMedicationData(data as any);
     return await database.write(async () => {
       const updatedMedication = await medication.update(item => {
-        const normalized = normalizeMedicationData(data as any);
-        Object.assign(item, normalized);
+        Object.assign(item, encrypted);
 
-        const hpId = (data as any).health_profile_id ?? (data as any).healthProfileId;
+        const hpId = getHealthProfileId(data as any);
         if (hpId != null) {
-          (item as any)._raw.health_profile_id = hpId;
+          (item as any).healthProfileId = hpId;
         }
       });
 
-      await updatedMedication.update(async (item: any) => {
-        const normalized = normalizeMedicationData(data as any);
-        if (normalized?.name != null) item.name = await EncryptionService.maybeEncrypt(normalized.name);
-        if (normalized?.dosage != null) item.dosage = await EncryptionService.maybeEncrypt(normalized.dosage);
-        if (normalized?.frequency != null) item.frequency = await EncryptionService.maybeEncrypt(normalized.frequency);
-        if (normalized?.notes != null) item.notes = await EncryptionService.maybeEncrypt(normalized.notes);
-      });
-
-      return {
-        id: updatedMedication.id,
-        name: await EncryptionService.maybeDecrypt((updatedMedication as any).name),
-        dosage: await EncryptionService.maybeDecrypt((updatedMedication as any).dosage),
-        frequency: await EncryptionService.maybeDecrypt((updatedMedication as any).frequency),
-        notes: await EncryptionService.maybeDecrypt((updatedMedication as any).notes),
-        health_profile_id: (updatedMedication as any)?._raw?.health_profile_id,
-      } as any;
+      return await mapMedicationRow(updatedMedication as any);
     });
   },
 
   async deleteMedication(medicationId: string) {
-    const medication = await getMedicationsCollection().find(medicationId);
-    return await database.write(async () => {
-      await medication.markAsDeleted();
-    });
+    try {
+      const medication = await getMedicationsCollection().find(medicationId);
+      return await database.write(async () => {
+        await medication.markAsDeleted();
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to delete medication: ${String(error?.message ?? error)}`);
+    }
   },
 };

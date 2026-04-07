@@ -42,8 +42,26 @@ export class HealthAdvisorAgent implements Agent {
         }
       }
 
+      const nutritionFlags = analysisResults?.nutritionResult?.flags ?? {};
+
+      const filteredConditions = conditions
+        .map((x: any) => String(x?.name ?? x ?? ''))
+        .filter((c) => {
+          const lower = c.toLowerCase();
+          const isSodiumCondition = ['hypertension', 'heart', 'kidney', 'blood pressure'].some((k) =>
+            lower.includes(k),
+          );
+          const isSugarCondition = ['diabetes', 'prediabetes', 'insulin'].some((k) => lower.includes(k));
+          const isFatCondition = ['cholesterol', 'hyperlipidemia'].some((k) => lower.includes(k));
+          if (isSodiumCondition && !nutritionFlags.highSodium) return false;
+          if (isSugarCondition && !nutritionFlags.highSugar) return false;
+          if (isFatCondition && !nutritionFlags.highSaturatedFat) return false;
+          return true;
+        })
+        .filter(Boolean);
+
       const retrieved = retrieveHealthKbContext({
-        conditions: conditions.map((x: any) => String(x?.name ?? x ?? '')).filter(Boolean),
+        conditions: filteredConditions,
         medications: medications.map((x: any) => String(x?.name ?? x ?? '')).filter(Boolean),
         analysisResults,
       });

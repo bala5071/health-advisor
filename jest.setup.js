@@ -32,10 +32,16 @@ jest.mock('expo-file-system/legacy', () => ({
   })),
 }));
 
+const mockSecureStoreMemory = new Map();
+
 jest.mock('expo-secure-store', () => ({
-  setItemAsync: jest.fn(async () => undefined),
-  getItemAsync: jest.fn(async () => null),
-  deleteItemAsync: jest.fn(async () => undefined),
+  setItemAsync: jest.fn(async (key, value) => {
+    mockSecureStoreMemory.set(String(key), String(value));
+  }),
+  getItemAsync: jest.fn(async (key) => mockSecureStoreMemory.get(String(key)) ?? null),
+  deleteItemAsync: jest.fn(async (key) => {
+    mockSecureStoreMemory.delete(String(key));
+  }),
 }));
 
 jest.mock('expo-linking', () => ({

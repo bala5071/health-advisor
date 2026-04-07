@@ -4,21 +4,36 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnboarding } from "../src/hooks/useOnboarding";
 import { useProfileCompletion } from "../src/hooks/useProfileCompletion";
 import ModelSetupScreen from "../src/components/ModelSetupScreen";
-import { QwenModelManager } from "../src/ai/models/QwenModelManager";
-import { SLMModelManager } from "../src/ai/models/SLMModelManager";
+import {
+  QwenModelManager,
+  getLocalMainPath,
+  getLocalMmprojPath,
+} from "../src/ai/models/QwenModelManager";
+import { SLMModelManager, getLocalSlmPath } from "../src/ai/models/SLMModelManager";
 import { useSettingsStore } from "../src/stores/useSettingsStore";
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 let MMKVImpl: any;
 const getMMKV = () => {
   if (!MMKVImpl) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require("react-native-mmkv");
-    MMKVImpl = mod?.MMKV ?? mod?.default ?? mod;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require("react-native-mmkv");
+      const Candidate = mod?.MMKV ?? mod?.default?.MMKV ?? mod?.default ?? mod;
+      if (typeof Candidate !== "function") {
+        throw new Error("react-native-mmkv MMKV export is not a constructor");
+      }
+      MMKVImpl = Candidate;
+    } catch {
+      throw new Error("react-native-mmkv is unavailable in this runtime");
+    }
   }
   return new MMKVImpl();
 };
 
 const SKIPPED_KEY = "models_setup_skipped";
+const PATHS_FINGERPRINT_KEY = "models_paths_fingerprint";
+const MIN_READY_BYTES = 10 * 1024 * 1024;
 
 const InitialLayout = () => {
   const pathname = usePathname();
@@ -37,6 +52,94 @@ const InitialLayout = () => {
     }
   });
   const [modelsReadyOverride, setModelsReadyOverride] = useState(false);
+  const [modelProbeDone, setModelProbeDone] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const startupProbe = async () => {
+      try {
+        const readyByFlags = QwenModelManager.areModelsReady() && SLMModelManager.isSLMReady();
+        const mainPath = getLocalMainPath();
+        const mmprojPath = getLocalMmprojPath();
+        const slmPath = getLocalSlmPath();
+
+        if (readyByFlags) {
+          if (!cancelled) {
+            setModelsReadyOverride(true);
+            setModelProbeDone(true);
+          }
+          return;
+        }
+
+        let fsAny: any = null;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          fsAny = require("expo-file-system/legacy");
+        } catch {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          fsAny = require("expo-file-system");
+        }
+
+        const getSize = async (path: string) => {
+          try {
+            const info = await fsAny?.getInfoAsync?.(path);
+            return typeof info?.size === "number" ? info.size : 0;
+          } catch {
+            return 0;
+          }
+        };
+
+        const [mainBytes, mmprojBytes, slmBytes] = await Promise.all([
+          getSize(mainPath),
+          getSize(mmprojPath),
+          getSize(slmPath),
+        ]);
+
+        const readyByDiskFallback =
+          mainBytes > MIN_READY_BYTES &&
+          mmprojBytes > MIN_READY_BYTES &&
+          slmBytes > MIN_READY_BYTES;
+
+        try {
+          const kv = getMMKV();
+          const fingerprint = `${mainPath}|${mmprojPath}|${slmPath}`;
+          const previous = kv.getString(PATHS_FINGERPRINT_KEY);
+          if (previous !== fingerprint) {
+            console.log("Model path fingerprint changed", { previous, fingerprint });
+            kv.set(PATHS_FINGERPRINT_KEY, fingerprint);
+          }
+        } catch {
+          // ignore
+        }
+
+        if (readyByDiskFallback) {
+          await Promise.all([
+            QwenModelManager.rehydrateQwenReadyFromDisk(MIN_READY_BYTES).catch(() => false),
+            SLMModelManager.rehydrateSlmReadyFromDisk(MIN_READY_BYTES).catch(() => false),
+          ]);
+
+          if (!cancelled) {
+            setModelsReadyOverride(true);
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setModelProbeDone(true);
+        }
+      }
+    };
+
+    startupProbe().catch(() => {
+      if (!cancelled) setModelProbeDone(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const modelsReady = useMemo(() => {
     return (
@@ -45,10 +148,16 @@ const InitialLayout = () => {
     );
   }, [modelsReadyOverride]);
 
-  const showModelSetup = !skippedModelSetup && !modelsReady;
+  const showModelSetup = modelProbeDone && !skippedModelSetup && !modelsReady;
 
   useEffect(() => {
-    if (showModelSetup) return;
+    if (!session) {
+      lastRedirectToRef.current = null;
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (showModelSetup || !modelProbeDone) return;
     if (loading || onboardingLoading || profileCompletionLoading) return;
 
     const safeReplace = (to: string) => {
@@ -61,22 +170,14 @@ const InitialLayout = () => {
     const inOnboardingGroup = segments[0] === "onboarding";
     const inAuthGroup = segments[0] === "(auth)";
 
-    if (!onboardingComplete) {
-      if (!inOnboardingGroup) {
-        safeReplace("/onboarding/welcome");
+    if (!session) {
+      if (!inAuthGroup) {
+        safeReplace("/(auth)/login");
       }
       return;
     }
 
-    if (session) {
-      if (!profileComplete) {
-        const authRoute = segments[1];
-        if (segments[0] !== "(auth)" || authRoute !== "complete-profile") {
-          safeReplace("/(auth)/complete-profile");
-        }
-        return;
-      }
-
+    if (profileComplete) {
       if (inAuthGroup) {
         safeReplace("/(tabs)/home");
         return;
@@ -85,10 +186,18 @@ const InitialLayout = () => {
       if (segments[0] !== "(tabs)") {
         safeReplace("/(tabs)/home");
       }
-    } else {
-      if (!inAuthGroup) {
-        safeReplace("/(auth)/login");
+      return;
+    }
+
+    if (!onboardingComplete) {
+      if (!inOnboardingGroup) {
+        safeReplace("/onboarding/welcome");
       }
+      return;
+    }
+
+    if (segments[0] !== "(tabs)") {
+      safeReplace("/(tabs)/home");
     }
   }, [
     session,
@@ -101,6 +210,7 @@ const InitialLayout = () => {
     pathname,
     router,
     showModelSetup,
+    modelProbeDone,
   ]);
 
   if (showModelSetup) {
@@ -133,9 +243,11 @@ const RootLayout = () => {
   }, [hydrate]);
 
   return (
-    <AuthProvider>
-      <InitialLayout />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <InitialLayout />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 };
 

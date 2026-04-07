@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Line, Rect, Polyline, Text as SvgText } from 'react-native-svg';
 import Card from '../common/Card';
 import { useTheme } from '../../theme/useTheme';
@@ -13,11 +13,8 @@ export type ChartSeries = {
   color?: string;
 };
 
-const CHART_WIDTH = 320;
 const CHART_HEIGHT = 160;
 const PAD = { top: 20, left: 45, right: 20, bottom: 40 };
-
-const innerW = CHART_WIDTH - PAD.left - PAD.right;
 const innerH = CHART_HEIGHT - PAD.top - PAD.bottom;
 
 export default function HealthChart({
@@ -28,6 +25,9 @@ export default function HealthChart({
   series: ChartSeries[];
 }) {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const chartWidth = Math.max(260, Math.min(width - 64, 760));
+  const innerW = chartWidth - PAD.left - PAD.right;
 
   const allData = useMemo(() => series.flatMap((s) => s.data), [series]);
   const labels = useMemo(
@@ -57,7 +57,7 @@ export default function HealthChart({
     <Card>
       <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
       <View style={styles.chart}>
-        <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+        <Svg width={chartWidth} height={CHART_HEIGHT}>
           {/* Y axis ticks */}
           {yTicks.map((tick, idx) => (
             <React.Fragment key={`tick-${idx}`}>
@@ -158,6 +158,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chart: {
-    height: 160,
+    flex: 1,
   },
 });

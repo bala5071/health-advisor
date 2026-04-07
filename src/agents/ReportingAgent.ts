@@ -91,6 +91,17 @@ export class ReportingAgent {
       .map((p) => NutritionCalculator.toSnapshot(p))
       .filter(Boolean) as any;
 
+    console.log('[Report] payloads sample:', JSON.stringify(
+      payloads.slice(0, 2).map(p => ({
+        verdict: p?.verdict,
+        nutritionResult: p?.nutritionResult,
+        nutrition: p?.nutrition,
+        analysis: p?.analysis,
+      })),
+      null, 2
+    ));
+    console.log('[Report] snapshots:', JSON.stringify(snapshots.slice(0, 2), null, 2));
+
     const windowTrend = NutritionCalculator.trendWindow(snapshots, days as any, toTs);
 
     // Compare last half vs first half for trend direction

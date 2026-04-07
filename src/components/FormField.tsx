@@ -13,9 +13,10 @@ export default function FormField({ placeholder, value, onChangeText, accessibil
   const theme = useTheme();
   return (
     <TextInput
-      style={[styles.input, { borderColor: theme.secondary, color: theme.text }]}
+      allowFontScaling
+      style={[styles.input, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
       placeholder={placeholder}
-      placeholderTextColor={theme.secondary}
+      placeholderTextColor={theme.textSecondary}
       value={value}
       onChangeText={onChangeText}
       accessibilityLabel={accessibilityLabel ?? placeholder}
@@ -27,8 +28,12 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
-    padding: 8,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 8,
-    borderRadius: 4,
+    borderRadius: 8,
+    fontSize: 15,
+    lineHeight: 23,
   },
 });

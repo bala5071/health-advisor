@@ -60,20 +60,25 @@ export default function NutritionLabel({
 
   return (
     <Card>
-      <Text style={[styles.header, { color: theme.text }]}>Nutrition</Text>
-      <View style={styles.table}>
+      <Text allowFontScaling style={[styles.header, { color: theme.text }]}>Nutrition</Text>
+      <View style={styles.list}>
         {rows.length === 0 ? (
-          <Text style={[styles.empty, { color: theme.text }]}>No nutrition facts available.</Text>
+          <Text allowFontScaling style={[styles.empty, { color: theme.text }]}>No nutrition facts available.</Text>
         ) : (
           rows.map((r) => {
             const pct = percentFor(r.dvKey);
+            const safePct = Math.max(0, Math.min(100, typeof pct === 'number' ? pct : 0));
+            const levelColor = safePct > 40 ? theme.avoid : safePct >= 20 ? theme.caution : theme.approved;
             return (
-              <View key={r.label} style={[styles.row, { borderBottomColor: theme.shadow }]}> 
-                <Text style={[styles.label, { color: theme.text }]}>{r.label}</Text>
-                <View style={styles.valueWrap}>
-                  <Text style={[styles.value, { color: theme.text }]}>{r.value}</Text>
-                  {pct != null ? <Text style={[styles.dv, { color: theme.text }]}>{pct}% DV</Text> : null}
+              <View key={r.label} style={styles.row}>
+                <View style={styles.rowTop}>
+                  <Text allowFontScaling style={[styles.label, { color: theme.text }]} numberOfLines={1}>{r.label}</Text>
+                  <Text allowFontScaling style={[styles.value, { color: theme.text }]}>{r.value}</Text>
                 </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${safePct}%`, backgroundColor: levelColor }]} />
+                </View>
+                <Text allowFontScaling style={[styles.dv, { color: theme.textSecondary }]}>{pct != null ? `${pct}% DV` : 'DV n/a'}</Text>
               </View>
             );
           })
@@ -85,44 +90,55 @@ export default function NutritionLabel({
 
 const styles = StyleSheet.create({
   header: {
-    fontSize: 16,
-    fontWeight: '900',
-    marginBottom: 10,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 26,
+    marginBottom: 12,
   },
-  table: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  row: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  list: {
     gap: 12,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    flex: 1,
+  row: {
+    gap: 6,
   },
-  valueWrap: {
+  rowTop: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 10,
   },
+  label: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 23,
+  },
   value: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 23,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(17, 24, 39, 0.12)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
   },
   dv: {
-    fontSize: 12,
-    fontWeight: '700',
-    opacity: 0.75,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 20,
+    opacity: 0.9,
   },
   empty: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 23,
     opacity: 0.75,
   },
 });

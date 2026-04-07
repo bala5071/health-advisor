@@ -1,11 +1,16 @@
-import React from "react";
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
-import { useTheme } from "../../theme/useTheme";
+import React from 'react';
+import { Text, StyleSheet, Pressable } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { useTheme } from '../../theme/useTheme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: 'primary' | 'secondary' | 'danger';
   accessibilityLabel?: string;
   accessibilityHint?: string;
   disabled?: boolean;
@@ -14,63 +19,97 @@ interface ButtonProps {
 export default function Button({
   title,
   onPress,
-  variant = "primary",
+  variant = 'primary',
   accessibilityLabel,
   accessibilityHint,
   disabled,
 }: ButtonProps) {
   const theme = useTheme();
+  const scale = useSharedValue(1);
+
+  const triggerLightHaptic = () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Haptics = require('expo-haptics');
+      Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    } catch {
+      // no-op
+    }
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const variantStyles = {
     primary: {
-      backgroundColor: theme.primary,
-      textColor: "#FFFFFF",
+      backgroundColor: '#34C759',
+      borderColor: '#34C759',
+      textColor: '#FFFFFF',
     },
     secondary: {
-      backgroundColor: theme.secondary,
-      textColor: "#FFFFFF",
+      backgroundColor: '#FFFFFF',
+      borderColor: '#34C759',
+      textColor: '#34C759',
     },
     danger: {
-      backgroundColor: theme.danger,
-      textColor: "#FFFFFF",
+      backgroundColor: '#FF3B30',
+      borderColor: '#FF3B30',
+      textColor: '#FFFFFF',
     },
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: variantStyles[variant].backgroundColor },
-        disabled ? styles.disabled : null,
-      ]}
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? title}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={disabled ? { disabled: true } : undefined}
-    >
-      <Text style={[styles.text, { color: variantStyles[variant].textColor }]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        style={[
+          styles.button,
+          {
+            backgroundColor: variantStyles[variant].backgroundColor,
+            borderColor: variantStyles[variant].borderColor,
+          },
+          disabled ? styles.disabled : null,
+        ]}
+        onPress={() => {
+          if (variant === 'primary' && !disabled) triggerLightHaptic();
+          onPress();
+        }}
+        disabled={disabled}
+        onPressIn={() => {
+          scale.value = withSpring(0.97, { damping: 20, stiffness: 250 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 16, stiffness: 220 });
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? title}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={disabled ? { disabled: true } : undefined}
+      >
+        <Text allowFontScaling style={[styles.text, theme.typography.body, { color: variantStyles[variant].textColor }]}>
+          {title}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
+    minHeight: 50,
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    paddingHorizontal: 18,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: 8,
+    marginVertical: 6,
+    borderWidth: 1,
   },
   disabled: {
     opacity: 0.5,
   },
   text: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: '600',
   },
 });

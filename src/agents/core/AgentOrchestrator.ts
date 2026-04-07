@@ -26,7 +26,12 @@ const lookupBarcode = async (_barcode: string | null): Promise<any | null> => {
 
 class AgentOrchestrator {
   async processImage(
-    imageUri: string,
+    imageInput:
+      | string
+      | {
+          productImageUri: string;
+          nutritionImageUri?: string | null;
+        },
     opts?: {
       userId?: string | null;
       onStep?: StepFn;
@@ -47,6 +52,11 @@ class AgentOrchestrator {
     };
 
     step('starting');
+
+    const productImageUri = typeof imageInput === 'string' ? imageInput : imageInput?.productImageUri;
+    const nutritionImageUri =
+      typeof imageInput === 'string' ? null : (imageInput?.nutritionImageUri ?? null);
+    const ocrImageUri = nutritionImageUri || productImageUri;
 
     // Lazy require agents/services
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -73,33 +83,16 @@ class AgentOrchestrator {
     const healthAdvisorAgent = new HealthAdvisorAgent();
     const voiceAgent = new VoiceAgent();
 
-    // Parallelize Vision + OCR to reduce overall pipeline time
+    // Run Vision first to reduce peak memory pressure on mobile devices.
     const tv = Date.now();
     step('detecting_product');
-    const visionPromise = visionAgent.process({
+    const visionRes = await visionAgent.process({
       id: 'vision',
       type: (undefined as any),
-      payload: { imageUri },
+      payload: { imageUri: productImageUri },
       priority: 1,
     } as any);
-
-    const tocr = Date.now();
-    step('extracting_text');
-    const ocrPromise = ocrAgent.process({
-      id: 'ocr',
-      type: (undefined as any),
-      payload: { imageUri },
-      priority: 1,
-    } as any);
-
-    step('barcode_lookup');
-    const barcodePromise = ocrPromise
-      .then((r) => extractBarcodeFromText(r?.result?.text ?? ''))
-      .then((barcode) => lookupBarcode(barcode));
-
-    const [visionRes, ocrRes, barcodeLookup] = await Promise.all([visionPromise, ocrPromise, barcodePromise]);
     logStep('vision', tv);
-    logStep('ocr', tocr);
 
     const visionResult = visionRes?.result;
     if (!visionResult?.productDetected) {
@@ -107,6 +100,19 @@ class AgentOrchestrator {
       console.log(`[pipeline] total ${Date.now() - t0}ms`);
       return { visionResult };
     }
+
+    const tocr = Date.now();
+    step('extracting_text');
+    const ocrRes = await ocrAgent.process({
+      id: 'ocr',
+      type: (undefined as any),
+      payload: { imageUri: ocrImageUri },
+      priority: 1,
+    } as any);
+    logStep('ocr', tocr);
+
+    step('barcode_lookup');
+    const barcodeLookup = await lookupBarcode(extractBarcodeFromText(ocrRes?.result?.text ?? ''));
     const ocrResult = ocrRes?.result;
 
     const ingredientsText = String(ocrResult?.ingredients || '');
@@ -172,6 +178,8 @@ class AgentOrchestrator {
 
     const fullResult = {
       userId: opts?.userId ?? null,
+      productImageUri,
+      nutritionImageUri,
       visionResult,
       ocrResult,
       barcodeLookup,

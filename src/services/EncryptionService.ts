@@ -24,14 +24,38 @@ const getRandomBytes = async (n: number): Promise<Uint8Array> => {
   return out;
 };
 
-const getUtils = (): any => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require('@noble/ciphers/utils.js');
+const toBase64 = (bytes: Uint8Array): string => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Buffer } = require('buffer');
+    return Buffer.from(bytes).toString('base64');
+  } catch {
+    const asBinary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+    if (typeof btoa === 'function') {
+      return btoa(asBinary);
+    }
+    throw new Error('Base64 encoding is unavailable in this runtime');
+  }
 };
 
-const getAes = () => {
+const fromBase64 = (value: string): Uint8Array => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Buffer } = require('buffer');
+    return Uint8Array.from(Buffer.from(value, 'base64'));
+  } catch {
+    if (typeof atob === 'function') {
+      const binary = atob(value);
+      return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    }
+    throw new Error('Base64 decoding is unavailable in this runtime');
+  }
+};
+
+const getAesGcm = () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require('@noble/ciphers/aes.js') as any;
+  const aes = require('@noble/ciphers/aes.js') as any;
+  return aes?.gcm ?? aes?.aesgcm ?? aes?.default?.gcm ?? aes?.default?.aesgcm;
 };
 
 const te = new TextEncoder();
@@ -46,11 +70,10 @@ export class EncryptionService {
     if (cachedKey) return cachedKey;
 
     const existing = await SecureStore.getItemAsync(KEY_NAME);
-    const utils = getUtils();
 
     if (existing) {
       try {
-        const parsed = utils.base64ToBytes(existing) as Uint8Array;
+        const parsed = fromBase64(existing);
         if (parsed && parsed.length === 32) {
           cachedKey = parsed;
           return cachedKey;
@@ -61,15 +84,17 @@ export class EncryptionService {
     }
 
     const key = (await getRandomBytes(32)) as Uint8Array;
-    await SecureStore.setItemAsync(KEY_NAME, utils.bytesToBase64(key));
+    await SecureStore.setItemAsync(KEY_NAME, toBase64(key));
     cachedKey = key;
     return cachedKey;
   }
 
   static async encryptString(plaintext: string): Promise<string> {
     const key = await this.getOrCreateKey();
-    const utils = getUtils();
-    const { aesgcm } = getAes();
+    const aesgcm = getAesGcm();
+    if (typeof aesgcm !== 'function') {
+      throw new Error('AES-GCM cipher is unavailable in this runtime');
+    }
 
     const iv = await getRandomBytes(12);
     const data = te.encode(String(plaintext ?? ''));
@@ -77,25 +102,27 @@ export class EncryptionService {
     const aead = aesgcm(key, iv);
     const sealed = aead.encrypt(data);
 
-    return `enc:v1:${utils.bytesToBase64(iv)}:${utils.bytesToBase64(sealed)}`;
+    return `enc:v1:${toBase64(iv)}:${toBase64(sealed)}`;
   }
 
   static async decryptString(value: string): Promise<string> {
     if (!isEncrypted(value)) return String(value ?? '');
 
     const key = await this.getOrCreateKey();
-    const utils = getUtils();
-    const { aesgcm } = getAes();
+    const aesgcm = getAesGcm();
+    if (typeof aesgcm !== 'function') {
+      return '';
+    }
 
     const parts = String(value).split(':');
     // enc:v1:<iv_b64>:<sealed_b64>
-    if (parts.length < 5) return '';
+    if (parts.length < 4) return '';
 
     const ivB64 = parts[2];
     const sealedB64 = parts.slice(3).join(':');
 
-    const iv = utils.base64ToBytes(ivB64);
-    const sealed = utils.base64ToBytes(sealedB64);
+    const iv = fromBase64(ivB64);
+    const sealed = fromBase64(sealedB64);
 
     try {
       const aead = aesgcm(key, iv);

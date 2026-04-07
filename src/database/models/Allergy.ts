@@ -8,6 +8,7 @@ export default class Allergy extends Model {
     health_profiles: { type: 'belongs_to', key: 'health_profile_id' },
   } as const;
 
+  @field('health_profile_id') healthProfileId: any;
   @relation('health_profiles', 'health_profile_id') healthProfile: any;
   @field('name') name: any;
   @field('severity') severity: any;

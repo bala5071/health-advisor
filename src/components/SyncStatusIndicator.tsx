@@ -3,7 +3,11 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../theme/useTheme';
 import { SyncManager, SyncStatus } from '../supabase/sync/SyncManager';
 
-export default function SyncStatusIndicator() {
+interface SyncStatusIndicatorProps {
+  suppressErrorState?: boolean;
+}
+
+export default function SyncStatusIndicator({ suppressErrorState = false }: SyncStatusIndicatorProps) {
   const theme = useTheme();
   const [status, setStatus] = useState<SyncStatus>(SyncManager.getStatus());
 
@@ -11,17 +15,19 @@ export default function SyncStatusIndicator() {
     return SyncManager.subscribe(setStatus);
   }, []);
 
+  const displayState = suppressErrorState && status.state === 'error' ? 'idle' : status.state;
+
   const label =
-    status.state === 'syncing'
+    displayState === 'syncing'
       ? 'Syncing'
-      : status.state === 'error'
+      : displayState === 'error'
         ? 'Sync Error'
         : 'Synced';
 
   const color =
-    status.state === 'syncing'
+    displayState === 'syncing'
       ? theme.secondary
-      : status.state === 'error'
+      : displayState === 'error'
         ? theme.danger
         : theme.primary;
 

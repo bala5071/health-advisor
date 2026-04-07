@@ -1,13 +1,31 @@
 import { Image } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const QWEN_MAX_SIZE = 960;
 const MIN_BYTES_USABLE = 10 * 1024;
+const VLM_MAX_IMAGE_BYTES = 900 * 1024;
+
+const normalizeFileUri = (uri: string): string => {
+  if (!uri) return uri;
+  if (/^[a-z]+:\/\//i.test(uri)) return uri;
+  if (uri.startsWith('/')) return `file://${uri}`;
+  return uri;
+};
+
+export const getImageByteSize = async (uri: string): Promise<number> => {
+  try {
+    const sourceUri = normalizeFileUri(uri);
+    const info = await (FileSystem as any).getInfoAsync(sourceUri);
+    return typeof info?.size === 'number' ? info.size : 0;
+  } catch {
+    return 0;
+  }
+};
 
 type QualityResult = {
   isUsable: boolean;
-  reason?: 'too_dark' | 'too_blurry' | 'too_small';
+  reason?: 'too_dark' | 'too_blurry' | 'too_small' | 'too_large';
 };
 
 const getImageSize = async (uri: string): Promise<{ width: number; height: number } | null> => {
@@ -26,22 +44,42 @@ const getImageSize = async (uri: string): Promise<{ width: number; height: numbe
 
 export const resizeForQwen = async (uri: string): Promise<string> => {
   try {
-    const size = await getImageSize(uri);
-    if (!size?.width || !size?.height) return uri;
+    const sourceUri = normalizeFileUri(uri);
+    const size = await getImageSize(sourceUri);
+    if (!size?.width || !size?.height) {
+      const compressed = await ImageManipulator.manipulateAsync(
+        sourceUri,
+        [],
+        { compress: 0.45, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      return compressed?.uri || sourceUri;
+    }
 
     const scale = Math.min(1, QWEN_MAX_SIZE / size.width, QWEN_MAX_SIZE / size.height);
-    if (scale >= 1) return uri;
+    if (scale >= 1) {
+      const originalInfo = await (FileSystem as any).getInfoAsync(sourceUri);
+      const originalSize = typeof originalInfo?.size === 'number' ? originalInfo.size : 0;
+      if (originalSize > VLM_MAX_IMAGE_BYTES) {
+        const compressed = await ImageManipulator.manipulateAsync(
+          sourceUri,
+          [],
+          { compress: 0.45, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        return compressed?.uri || sourceUri;
+      }
+      return sourceUri;
+    }
 
     const targetWidth = Math.max(1, Math.round(size.width * scale));
     const targetHeight = Math.max(1, Math.round(size.height * scale));
 
     const result = await ImageManipulator.manipulateAsync(
-      uri,
+      sourceUri,
       [{ resize: { width: targetWidth, height: targetHeight } }],
-      { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
+      { compress: 0.45, format: ImageManipulator.SaveFormat.JPEG },
     );
 
-    return result?.uri || uri;
+    return result?.uri || sourceUri;
   } catch {
     return uri;
   }
@@ -49,7 +87,8 @@ export const resizeForQwen = async (uri: string): Promise<string> => {
 
 export const imageToBase64 = async (uri: string): Promise<string> => {
   try {
-    const base64 = await (FileSystem as any).readAsStringAsync(uri, {
+    const sourceUri = normalizeFileUri(uri);
+    const base64 = await (FileSystem as any).readAsStringAsync(sourceUri, {
       encoding: (FileSystem as any).EncodingType.Base64,
     });
     return typeof base64 === 'string' ? base64 : '';
@@ -60,7 +99,8 @@ export const imageToBase64 = async (uri: string): Promise<string> => {
 
 export const assessQuality = async (uri: string): Promise<QualityResult> => {
   try {
-    const info = await (FileSystem as any).getInfoAsync(uri);
+    const sourceUri = normalizeFileUri(uri);
+    const info = await (FileSystem as any).getInfoAsync(sourceUri);
     const size = typeof info?.size === 'number' ? info.size : 0;
     if (size > 0 && size < MIN_BYTES_USABLE) {
       return { isUsable: false, reason: 'too_small' };
@@ -91,6 +131,10 @@ class ImageProcessor {
 
   async imageToBase64(uri: string): Promise<string> {
     return imageToBase64(uri);
+  }
+
+  async getImageByteSize(uri: string): Promise<number> {
+    return getImageByteSize(uri);
   }
 
   /**

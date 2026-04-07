@@ -26,7 +26,12 @@ export const useAgentPipeline = () => {
 
   const message = useMemo(() => pipelineStepMessages[step] || '', [step]);
 
-  const run = useCallback(async (opts: { imageUri: string; userId?: string | null }) => {
+  const run = useCallback(async (opts: {
+    imageUri?: string;
+    productImageUri?: string;
+    nutritionImageUri?: string | null;
+    userId?: string | null;
+  }) => {
     const runId = ++runIdRef.current;
     setStatus('running');
     setError(null);
@@ -34,13 +39,24 @@ export const useAgentPipeline = () => {
     setStep('starting');
 
     try {
-      const out = await agentOrchestrator.processImage(opts.imageUri, {
+      const productImageUri = opts.productImageUri ?? opts.imageUri;
+      if (!productImageUri) {
+        throw new Error('Product image is required');
+      }
+
+      const out = await agentOrchestrator.processImage(
+        {
+          productImageUri,
+          nutritionImageUri: opts.nutritionImageUri ?? null,
+        },
+        {
         userId: opts.userId ?? null,
         onStep: (s) => {
           if (runIdRef.current !== runId) return;
           setStep(s);
         },
-      });
+        },
+      );
 
       if (runIdRef.current !== runId) return null;
       setResult(out);

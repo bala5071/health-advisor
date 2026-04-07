@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../src/theme/useTheme';
 import { useHealthProfile } from '../../src/hooks/useHealthProfile';
 import Card from '../../src/components/common/Card';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CriticalAllergy = {
   id: string;
@@ -22,6 +23,10 @@ const isCriticalSeverity = (raw: any) => {
 export default function EmergencyScreen() {
   const theme = useTheme();
   const { dbAvailable, allergies } = useHealthProfile();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const [refreshing, setRefreshing] = useState(false);
 
   const critical = useMemo(() => {
     const rows = (allergies || []) as any[];
@@ -39,12 +44,22 @@ export default function EmergencyScreen() {
       .filter((a) => a.id && a.name);
   }, [allergies]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 350);
+  };
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 84 }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <Stack.Screen options={{ title: 'Emergency' }} />
 
       <Text
-        style={[styles.title, { color: theme.text }]}
+        allowFontScaling
+        style={[styles.title, theme.typography.display, { color: theme.text }]}
         accessibilityRole="header"
         accessibilityLabel="Emergency Mode"
       >
@@ -52,37 +67,46 @@ export default function EmergencyScreen() {
       </Text>
 
       <Card>
-        <Text style={[styles.info, { color: theme.text }]}>
+        <Text allowFontScaling style={[styles.info, { color: theme.text }]}>
           This screen shows a read-only list of your critical allergies for quick access.
         </Text>
       </Card>
 
       {!dbAvailable ? (
         <Card>
-          <Text style={[styles.info, { color: theme.text }]}>Local database is unavailable in this runtime.</Text>
+          <Text allowFontScaling style={[styles.info, { color: theme.text }]}>Local database is unavailable in this runtime.</Text>
         </Card>
       ) : null}
 
       <Card>
-        <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">
+        <Text
+          allowFontScaling
+          style={[styles.sectionTitle, theme.typography.body, { color: theme.text }]}
+          accessibilityRole="header"
+        >
           Critical Allergies
         </Text>
 
         {critical.length === 0 ? (
-          <Text style={[styles.info, { color: theme.text }]}>No critical allergies found.</Text>
+          <View style={styles.emptyWrap}>
+            <Text allowFontScaling style={[styles.emptyEmoji, { color: theme.textSecondary }]}>🛡️</Text>
+            <Text allowFontScaling style={[styles.info, { color: theme.text }]}>No critical allergies found.</Text>
+          </View>
         ) : (
-          critical.map((a) => (
-            <View
-              key={a.id}
-              style={[styles.row, { borderBottomColor: theme.secondary }]}
-              accessible
-              accessibilityLabel={`Allergy ${a.name}. Severity ${a.severity}.`}
-            >
-              <Text style={[styles.name, { color: theme.text }]}>{a.name}</Text>
-              <Text style={[styles.severity, { color: theme.danger }]}>Severity: {a.severity}</Text>
-              {a.notes ? <Text style={[styles.notes, { color: theme.text }]}>{a.notes}</Text> : null}
-            </View>
-          ))
+          <View style={[styles.rowsWrap, isTablet && styles.rowsWrapTablet]}>
+            {critical.map((a) => (
+              <View
+                key={a.id}
+                style={[styles.row, isTablet && styles.rowTablet, { borderBottomColor: theme.secondary, backgroundColor: theme.surface }]}
+                accessible
+                accessibilityLabel={`Allergy ${a.name}. Severity ${a.severity}.`}
+              >
+                <Text allowFontScaling style={[styles.name, { color: theme.text }]}>{a.name}</Text>
+                <Text allowFontScaling style={[styles.severity, { color: theme.danger }]}>Severity: {a.severity}</Text>
+                {a.notes ? <Text allowFontScaling style={[styles.notes, { color: theme.text }]}>{a.notes}</Text> : null}
+              </View>
+            ))}
+          </View>
         )}
       </Card>
     </ScrollView>
@@ -98,36 +122,58 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '900',
-    textAlign: 'center',
+    textAlign: 'left',
+    paddingHorizontal: 2,
+    paddingTop: 2,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     marginBottom: 10,
   },
   info: {
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 18,
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 23,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  emptyEmoji: {
+    fontSize: 34,
+  },
+  rowsWrap: {
+    gap: 10,
+  },
+  rowsWrapTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   row: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  rowTablet: {
+    width: '48.5%',
   },
   name: {
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 26,
   },
   severity: {
     marginTop: 4,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
+    lineHeight: 20,
   },
   notes: {
     marginTop: 6,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
+    lineHeight: 20,
   },
 });

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../src/theme/useTheme';
-import Card from '../../src/components/common/Card';
-import Button from '../../src/components/common/Button';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/components/AuthProvider';
+import { useTheme } from '../../src/theme/useTheme';
 import { GDPRService } from '../../src/services/GDPRService';
 import { supabase } from '../../src/supabase/client';
 
 export default function AccountSettingsScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const { user, signOut } = useAuth();
 
   const [busy, setBusy] = useState(false);
@@ -103,77 +104,161 @@ export default function AccountSettingsScreen() {
     );
   };
 
+  const sectionHeader = (title: string) => (
+    <Text style={[styles.sectionHeader, theme.typography.caption, { color: theme.textSecondary }]}>{title}</Text>
+  );
+
+  const chevron = <Ionicons name="chevron-forward" size={17} color="#C7C7CC" />;
+
+  const RowIcon = ({ name, bg, color }: { name: string; bg: string; color: string }) => (
+    <View style={[styles.iconCircle, { backgroundColor: bg }]}> 
+      <Ionicons name={name as any} size={17} color={color} />
+    </View>
+  );
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={[styles.title, { color: theme.text }]}>Account</Text>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: theme.background }]}
+      contentContainerStyle={[styles.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 20 }]}
+    >
+      <Text style={[styles.screenTitle, theme.typography.display, { color: theme.text }]}>Account</Text>
 
-      <Card>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Danger zone</Text>
-        <Button
-          title={busy ? 'Working…' : 'Clear local data'}
-          onPress={wipeLocal}
-          variant="secondary"
-          disabled={busy}
-          accessibilityLabel="Clear local data"
-          accessibilityHint="Clears your stored health data from this device"
-        />
-        <Button
-          title={busy ? 'Working…' : 'Delete account'}
-          onPress={deleteAccount}
-          disabled={busy}
-          accessibilityLabel="Delete account"
-          accessibilityHint="Deletes your account and clears local data"
-        />
-
-        {error ? <Text style={[styles.err, { color: theme.danger }]}>Error: {error}</Text> : null}
-      </Card>
-
-      <Card>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Sign out</Text>
-        <Button
-          title="Sign out"
-          onPress={() => signOut?.()}
-          variant="secondary"
-          accessibilityLabel="Sign out"
-          accessibilityHint="Signs you out of your account"
-        />
-      </Card>
-
-      <View style={styles.footerRow}>
-        <Button
-          title="Back to Settings"
-          onPress={() => router.back()}
-          variant="secondary"
-          accessibilityLabel="Back to Settings"
-          accessibilityHint="Returns to settings"
-        />
+      {sectionHeader('ACCOUNT')}
+      <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <View style={[styles.row, { backgroundColor: theme.surface }]}>
+          <View style={styles.rowLeft}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>
+                {(user?.email ?? 'U').slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <View>
+              <Text style={[styles.accountEmail, theme.typography.body, { color: theme.text }]}>{user?.email ?? 'Not signed in'}</Text>
+              <Text style={[styles.accountMeta, theme.typography.caption, { color: theme.textSecondary }]}>Health Advisor Account</Text>
+            </View>
+          </View>
+        </View>
       </View>
+
+      {sectionHeader('SESSION')}
+      <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Pressable style={[styles.row, { backgroundColor: theme.surface }]} onPress={() => signOut?.()}>
+          <View style={styles.rowLeft}>
+            <RowIcon name="log-out" bg="#FF9500" color="#FFFFFF" />
+            <Text style={[styles.rowLabel, theme.typography.body, { color: theme.text }]}>Sign Out</Text>
+          </View>
+          {chevron}
+        </Pressable>
+      </View>
+
+      {sectionHeader('DATA')}
+      <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Pressable style={[styles.row, { backgroundColor: theme.surface }]} onPress={wipeLocal} disabled={busy}>
+          <View style={styles.rowLeft}>
+            <RowIcon name="trash-bin" bg="#FF9500" color="#FFFFFF" />
+            <Text style={[styles.rowLabel, theme.typography.body, { color: theme.text }]}>{busy ? 'Working…' : 'Clear Local Data'}</Text>
+          </View>
+          {chevron}
+        </Pressable>
+      </View>
+
+      {sectionHeader('DANGER ZONE')}
+      <View style={[styles.group, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Pressable style={[styles.row, { backgroundColor: theme.surface }]} onPress={deleteAccount} disabled={busy}>
+          <View style={styles.rowLeft}>
+            <RowIcon name="warning" bg="#FF3B30" color="#FFFFFF" />
+            <Text style={[styles.rowLabel, theme.typography.body, styles.destructive]}>{busy ? 'Working…' : 'Delete Account'}</Text>
+          </View>
+          {chevron}
+        </Pressable>
+      </View>
+
+      {error ? <Text style={[styles.errorText, { color: theme.danger }]}>Error: {error}</Text> : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: {
-    padding: 16,
-    gap: 12,
+    paddingBottom: 24,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 6,
+  screenTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    textAlign: 'left',
+    marginBottom: 0,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    marginBottom: 10,
+  sectionHeader: {
+    textTransform: 'uppercase',
+    paddingTop: 24,
+    paddingBottom: 6,
+    paddingHorizontal: 16,
+    letterSpacing: 0.3,
+    fontWeight: '600',
   },
-  err: {
-    marginTop: 8,
+  group: {
+    marginHorizontal: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  row: {
+    minHeight: 50,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#34C759',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  accountEmail: {
+    fontWeight: '400',
+  },
+  accountMeta: {
+    fontWeight: '400',
+  },
+  rowLabel: {
+    fontWeight: '400',
+  },
+  destructive: {
+    color: '#FF3B30',
+  },
+  errorText: {
+    marginTop: 12,
+    marginHorizontal: 16,
     fontSize: 13,
-    fontWeight: '800',
-  },
-  footerRow: {
-    marginTop: 4,
+    color: '#FF3B30',
+    fontWeight: '600',
   },
 });

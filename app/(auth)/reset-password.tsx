@@ -1,10 +1,11 @@
 import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Alert } from 'react-native';
+import { View, Text, TextInput, Alert, ScrollView, StyleSheet } from 'react-native';
 import { supabase } from '../../src/supabase/client';
 import { useTheme } from '../../src/theme/useTheme';
 import Button from '../../src/components/common/Button';
+import Card from '../../src/components/common/Card';
 
 const getFragmentParams = (url: string) => {
   const hashIndex = url.indexOf('#');
@@ -115,53 +116,84 @@ export default function ResetPassword() {
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 16, backgroundColor: theme.background }}>
+    <ScrollView
+      style={[styles.root, { backgroundColor: theme.background }]}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <Stack.Screen options={{ title: 'Reset Password' }} />
 
-      <Text style={{ fontSize: 24, marginBottom: 16, color: theme.text }} accessibilityRole="header">
+      <Text style={[styles.title, theme.typography.display, { color: theme.text }]} accessibilityRole="header">
         Reset Password
       </Text>
 
-      {!sessionReady ? (
-        <Text style={{ marginBottom: 16, color: theme.text }}>
-          Open this screen from the password reset link sent to your email.
-        </Text>
-      ) : (
-        <Text style={{ marginBottom: 16, color: theme.text }}>
-          Enter your new password below.
-        </Text>
-      )}
+      <Card>
+        {!sessionReady ? (
+          <Text style={[styles.helper, theme.typography.subhead, { color: theme.text }]}>Open this screen from the password reset link sent to your email.</Text>
+        ) : (
+          <Text style={[styles.helper, theme.typography.subhead, { color: theme.text }]}>Enter your new password below.</Text>
+        )}
 
-      <TextInput
-        placeholder="New password"
-        placeholderTextColor={theme.secondary}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={{ borderWidth: 1, borderColor: theme.secondary, color: theme.text, padding: 8, marginBottom: 8, borderRadius: 4 }}
-        accessibilityLabel="New password"
-      />
+        <TextInput
+          placeholder="New password"
+          placeholderTextColor={theme.secondary}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={[styles.input, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
+          accessibilityLabel="New password"
+        />
 
-      <TextInput
-        placeholder="Confirm new password"
-        placeholderTextColor={theme.secondary}
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry
-        style={{ borderWidth: 1, borderColor: theme.secondary, color: theme.text, padding: 8, marginBottom: 16, borderRadius: 4 }}
-        accessibilityLabel="Confirm new password"
-      />
+        <TextInput
+          placeholder="Confirm new password"
+          placeholderTextColor={theme.secondary}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          style={[styles.input, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
+          accessibilityLabel="Confirm new password"
+        />
 
-      <Button
-        title={loading ? 'Updating...' : 'Update Password'}
-        onPress={handleUpdatePassword}
-        disabled={loading || !sessionReady}
-        accessibilityHint="Updates your account password"
-      />
+        <Button
+          title={loading ? 'Updating...' : 'Update Password'}
+          onPress={handleUpdatePassword}
+          disabled={loading || !sessionReady}
+          accessibilityHint="Updates your account password"
+        />
+      </Card>
 
-      <View style={{ marginTop: 16 }}>
+      <View style={styles.buttonWrap}>
         <Button title="Back to Login" onPress={() => router.replace('/(auth)/login')} variant="secondary" accessibilityHint="Returns to login" />
       </View>
-    </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  container: {
+    padding: 16,
+    gap: 8,
+  },
+  title: {
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  helper: {
+    marginBottom: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    fontSize: 17,
+  },
+  buttonWrap: {
+    marginTop: 8,
+  },
+});

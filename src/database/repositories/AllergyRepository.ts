@@ -14,83 +14,87 @@ const normalizeAllergyData = (data: Partial<Allergy> & Record<string, any>) => {
   } as Partial<Allergy>;
 };
 
+const encryptAllergyData = async (data: Partial<Allergy> & Record<string, any>) => {
+  const normalized = normalizeAllergyData(data);
+  return {
+    ...normalized,
+    ...(normalized?.name != null ? { name: await EncryptionService.maybeEncrypt(normalized.name) } : null),
+    ...(normalized?.notes != null ? { notes: await EncryptionService.maybeEncrypt(normalized.notes) } : null),
+  } as Record<string, any>;
+};
+
+const getHealthProfileId = (data: Partial<Allergy> & Record<string, any>) => (
+  (data as any)?.health_profile_id ?? (data as any)?.healthProfileId ?? null
+);
+
+const mapAllergyRow = async (row: any) => ({
+  id: row.id,
+  name: await EncryptionService.maybeDecrypt(row.name),
+  severity: row.severity,
+  notes: await EncryptionService.maybeDecrypt(row.notes),
+  health_profile_id: row.healthProfileId,
+});
+
 export const AllergyRepository = {
   async createAllergy(data: Partial<Allergy>) {
-    return await database.write(async () => {
-      const newAllergy = await getAllergiesCollection().create(allergy => {
-        const normalized = normalizeAllergyData(data as any);
-        Object.assign(allergy, normalized);
+    try {
+      const hpId = getHealthProfileId(data as any);
+      if (!hpId) {
+        throw new Error('health_profile_id is required to create an allergy');
+      }
 
-        const hpId = (data as any).health_profile_id ?? (data as any).healthProfileId;
-        if (hpId != null) {
-          (allergy as any)._raw.health_profile_id = hpId;
-        }
+      const encrypted = await encryptAllergyData(data as any);
+      return await database.write(async () => {
+        const newAllergy = await getAllergiesCollection().create(allergy => {
+          Object.assign(allergy, encrypted);
+          (allergy as any).healthProfileId = hpId;
+        });
+
+        return await mapAllergyRow(newAllergy as any);
       });
-
-      await newAllergy.update(async (item: any) => {
-        const normalized = normalizeAllergyData(data as any);
-        if (normalized?.name != null) item.name = await EncryptionService.maybeEncrypt(normalized.name);
-        if (normalized?.notes != null) item.notes = await EncryptionService.maybeEncrypt(normalized.notes);
-      });
-
-      return {
-        id: newAllergy.id,
-        name: await EncryptionService.maybeDecrypt((newAllergy as any).name),
-        severity: (newAllergy as any).severity,
-        notes: await EncryptionService.maybeDecrypt((newAllergy as any).notes),
-        health_profile_id: (newAllergy as any)?._raw?.health_profile_id,
-      } as any;
-    });
+    } catch (error: any) {
+      throw new Error(`Failed to create allergy: ${String(error?.message ?? error)}`);
+    }
   },
 
   async getAllergies(healthProfileId: string) {
-    const rows = await getAllergiesCollection().query(Q.where('health_profile_id', healthProfileId)).fetch();
-    const out: any[] = [];
-    for (const r of rows as any[]) {
-      out.push({
-        id: r.id,
-        name: await EncryptionService.maybeDecrypt(r.name),
-        severity: r.severity,
-        notes: await EncryptionService.maybeDecrypt(r.notes),
-        health_profile_id: (r as any)?._raw?.health_profile_id,
-      });
+    try {
+      const rows = await getAllergiesCollection().query(Q.where('health_profile_id', healthProfileId)).fetch();
+      const out: any[] = [];
+      for (const r of rows as any[]) {
+        out.push(await mapAllergyRow(r));
+      }
+      return out;
+    } catch (error: any) {
+      throw new Error(`Failed to fetch allergies: ${String(error?.message ?? error)}`);
     }
-    return out;
   },
 
   async updateAllergy(allergyId: string, data: Partial<Allergy>) {
     const allergy = await getAllergiesCollection().find(allergyId);
+    const encrypted = await encryptAllergyData(data as any);
     return await database.write(async () => {
       const updatedAllergy = await allergy.update(item => {
-        const normalized = normalizeAllergyData(data as any);
-        Object.assign(item, normalized);
+        Object.assign(item, encrypted);
 
-        const hpId = (data as any).health_profile_id ?? (data as any).healthProfileId;
+        const hpId = getHealthProfileId(data as any);
         if (hpId != null) {
-          (item as any)._raw.health_profile_id = hpId;
+          (item as any).healthProfileId = hpId;
         }
       });
 
-      await updatedAllergy.update(async (item: any) => {
-        const normalized = normalizeAllergyData(data as any);
-        if (normalized?.name != null) item.name = await EncryptionService.maybeEncrypt(normalized.name);
-        if (normalized?.notes != null) item.notes = await EncryptionService.maybeEncrypt(normalized.notes);
-      });
-
-      return {
-        id: updatedAllergy.id,
-        name: await EncryptionService.maybeDecrypt((updatedAllergy as any).name),
-        severity: (updatedAllergy as any).severity,
-        notes: await EncryptionService.maybeDecrypt((updatedAllergy as any).notes),
-        health_profile_id: (updatedAllergy as any)?._raw?.health_profile_id,
-      } as any;
+      return await mapAllergyRow(updatedAllergy as any);
     });
   },
 
   async deleteAllergy(allergyId: string) {
-    const allergy = await getAllergiesCollection().find(allergyId);
-    return await database.write(async () => {
-      await allergy.markAsDeleted();
-    });
+    try {
+      const allergy = await getAllergiesCollection().find(allergyId);
+      return await database.write(async () => {
+        await allergy.markAsDeleted();
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to delete allergy: ${String(error?.message ?? error)}`);
+    }
   },
 };

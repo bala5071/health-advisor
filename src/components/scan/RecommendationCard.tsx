@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import Card from '../common/Card';
 import { useTheme } from '../../theme/useTheme';
 
@@ -19,56 +20,71 @@ export default function RecommendationCard({
   const palette = useMemo(() => {
     if (verdict === 'APPROVED') {
       return {
-        bg: 'rgba(46, 204, 113, 0.12)',
-        border: 'rgba(46, 204, 113, 0.45)',
-        text: '#1D6B3A',
+        icon: '✅',
+        bg: '#2ECC71',
+        text: '#FFFFFF',
       };
     }
     if (verdict === 'CAUTION') {
       return {
-        bg: 'rgba(241, 196, 15, 0.14)',
-        border: 'rgba(241, 196, 15, 0.55)',
-        text: '#6A4B00',
+        icon: '⚠️',
+        bg: '#F39C12',
+        text: '#FFFFFF',
       };
     }
     return {
-      bg: 'rgba(231, 76, 60, 0.12)',
-      border: 'rgba(231, 76, 60, 0.55)',
-      text: theme.danger,
+      icon: '🚫',
+      bg: '#E74C3C',
+      text: '#FFFFFF',
     };
-  }, [theme.danger, verdict]);
+  }, [verdict]);
 
   const label = verdict;
 
   return (
-    <Card>
-      <View style={[styles.container, { backgroundColor: palette.bg, borderColor: palette.border }]}>
-        <Text style={[styles.verdict, { color: palette.text }]}>{label}</Text>
-        {title ? <Text style={[styles.title, { color: theme.text }]}>{title}</Text> : null}
-        {subtitle ? <Text style={[styles.subtitle, { color: theme.text }]}>{subtitle}</Text> : null}
-      </View>
-    </Card>
+    <Animated.View entering={FadeInDown.springify().damping(18).stiffness(220)}>
+      <Card>
+        <View style={[styles.container, { backgroundColor: palette.bg }]}> 
+          <View style={styles.verdictRow}>
+            <Text allowFontScaling style={styles.icon}>{palette.icon}</Text>
+            <Text allowFontScaling style={[styles.verdict, { color: palette.text }]}>{label}</Text>
+          </View>
+          {title ? <Text allowFontScaling style={[styles.title, { color: '#FFFFFF' }]}>{title}</Text> : null}
+          {subtitle ? <Text allowFontScaling style={[styles.subtitle, { color: '#F4FFF7' }]}>{subtitle}</Text> : null}
+        </View>
+      </Card>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 14,
-    gap: 6,
+    borderRadius: 16,
+    padding: 18,
+    gap: 10,
+  },
+  verdictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  icon: {
+    fontSize: 24,
   },
   verdict: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
+    fontSize: 28,
+    fontWeight: '700',
+    lineHeight: 42,
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '600',
+    lineHeight: 33,
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 23,
   },
 });

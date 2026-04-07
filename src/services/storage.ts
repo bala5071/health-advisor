@@ -3,6 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 const FILE_MARKER_PREFIX = '__file__:';
 const SECURESTORE_MAX_BYTES_SOFT = 1800;
 
+const sanitizeKey = (key: string): string => {
+  return String(key).replace(/[^a-zA-Z0-9._-]/g, '_');
+};
+
 async function getFileSystem() {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -32,24 +36,26 @@ function utf8ByteLength(value: string): number {
 
 export const storage = {
   setItem: async (key: string, value: string) => {
+    const secureStoreKey = sanitizeKey(key);
     const byteLength = utf8ByteLength(value);
     if (byteLength > SECURESTORE_MAX_BYTES_SOFT) {
       const FileSystem: any = await getFileSystem();
       const dir = await ensureStorageDir(FileSystem);
       const path = `${dir}${safeKeyToFileName(key)}.txt`;
       await FileSystem.writeAsStringAsync(path, value, { encoding: FileSystem.EncodingType.UTF8 });
-      await SecureStore.setItemAsync(key, `${FILE_MARKER_PREFIX}${byteLength}`);
+      await SecureStore.setItemAsync(secureStoreKey, `${FILE_MARKER_PREFIX}${byteLength}`);
       return;
     }
 
     try {
-      await SecureStore.setItemAsync(key, value);
+      await SecureStore.setItemAsync(secureStoreKey, value);
     } catch {
       throw new Error('Failed to persist value');
     }
   },
   getItem: async (key: string) => {
-    const stored = await SecureStore.getItemAsync(key);
+    const secureStoreKey = sanitizeKey(key);
+    const stored = await SecureStore.getItemAsync(secureStoreKey);
     if (stored?.startsWith(FILE_MARKER_PREFIX)) {
       const FileSystem: any = await getFileSystem();
       const dir = await ensureStorageDir(FileSystem);
@@ -62,6 +68,7 @@ export const storage = {
     return stored;
   },
   removeItem: async (key: string) => {
+    const secureStoreKey = sanitizeKey(key);
     try {
       const FileSystem: any = await getFileSystem();
       const dir = await ensureStorageDir(FileSystem);
@@ -70,6 +77,6 @@ export const storage = {
     } catch {
       // ignore
     }
-    await SecureStore.deleteItemAsync(key);
+    await SecureStore.deleteItemAsync(secureStoreKey);
   },
 };

@@ -8,8 +8,10 @@ export type VisionResult = {
   productType?: 'food' | 'medicine' | 'supplement' | 'cosmetic' | 'other';
   confidence?: number;
   rawAnswers?: string[];
-  reason?: 'too_dark' | 'too_blurry' | 'too_small';
+  reason?: 'too_dark' | 'too_blurry' | 'too_small' | 'too_large';
 };
+
+const MAX_SAFE_VLM_IMAGE_BYTES = 900 * 1024;
 
 type VisionTraceEvent = {
   step: string;
@@ -110,13 +112,22 @@ export class VisionAgent implements Agent {
       const resizedUri = await imageProcessor.resizeForQwen(imageUri);
       console.log('VisionAgent.analyze: resizedUri', { resizedUri });
       trace('resized', { resizedUri });
-      console.log('VisionAgent.analyze: STEP2 base64');
-      trace('base64');
-      const base64 = await imageProcessor.imageToBase64(resizedUri);
-      console.log('VisionAgent.analyze: base64 length', { bytes: base64?.length ?? 0 });
-      trace('base64_ready', { bytes: base64?.length ?? 0 });
-      if (!base64) {
-        return { productDetected: false };
+      console.log('VisionAgent.analyze: STEP2 size check');
+      trace('size_check');
+      const imageBytes = await imageProcessor.getImageByteSize(resizedUri);
+      console.log('VisionAgent.analyze: resized bytes', { imageBytes });
+      trace('size_ready', { imageBytes });
+      if (imageBytes <= 0) {
+        return { productDetected: false, reason: 'too_small' };
+      }
+
+      if (imageBytes > MAX_SAFE_VLM_IMAGE_BYTES) {
+        console.log('VisionAgent.analyze: skipping VLM due to large image', {
+          imageBytes,
+          limit: MAX_SAFE_VLM_IMAGE_BYTES,
+        });
+        trace('skipped_large_image', { imageBytes, limit: MAX_SAFE_VLM_IMAGE_BYTES });
+        return { productDetected: false, reason: 'too_large' };
       }
 
       // STEP 3 — Load model (if not loaded)
@@ -137,7 +148,7 @@ export class VisionAgent implements Agent {
         'Is there a food product, medicine, supplement, or \n     consumer health product in this image? \n     Answer with only: YES or NO';
       console.log('VisionAgent.analyze: STEP4 Q1');
       trace('q1');
-      const a1 = await qwenVLMRunner.runVQA(base64, q1);
+      const a1 = await qwenVLMRunner.runVQA(resizedUri, q1);
       console.log('VisionAgent.analyze: A1', a1);
       trace('a1', a1);
       rawAnswers.push(a1);
@@ -158,7 +169,7 @@ export class VisionAgent implements Agent {
         'What is the exact product name shown on the label? \n     Answer in 10 words or less.';
       console.log('VisionAgent.analyze: STEP4 Q2');
       trace('q2');
-      const a2 = await qwenVLMRunner.runVQA(base64, q2);
+      const a2 = await qwenVLMRunner.runVQA(resizedUri, q2);
       console.log('VisionAgent.analyze: A2', a2);
       trace('a2', a2);
       rawAnswers.push(a2);
@@ -167,7 +178,7 @@ export class VisionAgent implements Agent {
         'What type of product is this? \n     Answer with exactly one word from: \n     food / medicine / supplement / cosmetic / other';
       console.log('VisionAgent.analyze: STEP4 Q3');
       trace('q3');
-      const a3 = await qwenVLMRunner.runVQA(base64, q3);
+      const a3 = await qwenVLMRunner.runVQA(resizedUri, q3);
       console.log('VisionAgent.analyze: A3', a3);
       trace('a3', a3);
       rawAnswers.push(a3);
@@ -200,9 +211,10 @@ export class VisionAgent implements Agent {
       console.log('VisionAgent.analyze: complete', result);
       trace('complete', result);
       return result;
-    } catch {
-      console.log('VisionAgent.analyze: failed');
-      trace('failed');
+    } catch (error: unknown) {
+      const message = String((error as any)?.message || error || '');
+      console.log('VisionAgent.analyze: failed', { message });
+      trace('failed', { message });
       return { productDetected: false };
     } finally {
       // STEP 6 — Unload model after analysis to free RAM
